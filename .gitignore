@@ -1,0 +1,60 @@
+# Go binary executables
+/bin/
+/build/
+/*.exe
+/*.out
+/*.test
+
+# Go workspace file
+*.workspace
+
+# Dependency directories
+/vendor/
+
+# Go module files
+go.sum
+go.mod
+
+# IDE/editor specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Mac system files
+.DS_Store
+
+# Linux system files
+*.swp
+*~
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Database files (if using SQLite or similar)
+*.db
+*.sqlite
+
+# Docker files (if any)
+.dockerignore
+Dockerfile
+
+# Coverage reports
+coverage/
+*.coverprofile
+
+# Build directories and files
+/dist/
+/build/
+
+# Ignore config example files (to keep example files, not real config files)
+example_config.yaml
