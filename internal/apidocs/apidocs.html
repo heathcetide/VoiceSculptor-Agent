@@ -35,26 +35,30 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js"></script>
-    <script>     document.addEventListener('DOMContentLoaded', function () {
-        const editor = CodeMirror.fromTextArea(document.getElementById('json-editor'), {
-            mode: 'application/json',
-            lineNumbers: true,
-            theme: 'default',
-            autorefresh: true
-        });
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const editor = CodeMirror.fromTextArea(document.getElementById('json-editor'), {
+                mode: 'application/json',
+                lineNumbers: true,
+                theme: 'default',
+                autorefresh: true
+            });
 
-        // 自动同步内容到 Alpine 数据模型
-        editor.on('change', function (cm) {
-            Alpine.store('tester').body = cm.getValue();
-        });
+            // Store editor in Alpine.js store
+            Alpine.store('codeMirrorEditor', editor);
 
-        // 监听 Alpine 数据变化，更新编辑器
-        new MutationObserver(() => {
-            if (editor.getValue() !== Alpine.raw(Alpine.store('tester').body)) {
-                editor.setValue(Alpine.raw(Alpine.store('tester').body));
-            }
-        }).observe(editor.getWrapperElement(), {childList: true, subtree: true});
-    });
+            // Automatically sync changes from CodeMirror to Alpine store
+            editor.on('change', function (cm) {
+                Alpine.store('tester').body = cm.getValue();  // Update Alpine's tester body
+            });
+
+            // Sync Alpine store changes back to CodeMirror
+            new MutationObserver(() => {
+                if (editor.getValue() !== Alpine.raw(Alpine.store('tester').body)) {
+                    editor.setValue(Alpine.raw(Alpine.store('tester').body));  // Update editor if Alpine store changes
+                }
+            }).observe(editor.getWrapperElement(), {childList: true, subtree: true});
+        });
     </script>
 </head>
 
@@ -102,6 +106,17 @@
             el.innerHTML = marked.parse(el.textContent)
         })
         Alpine.store('codeMirrorEditor', null);
+        Alpine.store('tester', {
+            path: '',
+            method: 'GET',
+            headers: [{ key: '', value: '' }],
+            params: [{ key: '', value: '' }],
+            body: '',
+            bodyType: 'json',
+            response: null,
+            statusCode: null,
+            duration: 0
+        });
     })
 
     function renderMethodClass(method) {
@@ -847,13 +862,9 @@
         });
         Alpine.store('codeMirrorEditor', editor);
         el.classList.add('cm-initialized');
-        editor.on('change', cm => {
-            Alpine.store('tester').body = cm.getValue();
-        });
     }
-})"
-                        >
-                            <label class="block text-sm font-medium text-purple-700">请求体</label>
+})">
+                        <label class="block text-sm font-medium text-purple-700">请求体</label>
                             <textarea id="json-editor" x-model="tester.body" placeholder="请输入 JSON..."></textarea>
                         </div>
                     </template>

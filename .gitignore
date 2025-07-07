@@ -12,8 +12,6 @@
 /vendor/
 
 # Go module files
-go.sum
-go.mod
 
 # IDE/editor specific files
 .idea/
