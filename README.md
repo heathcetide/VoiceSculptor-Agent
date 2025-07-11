@@ -1,7 +1,7 @@
 # VoiceSculptor
 
 <div align="center">
-    <img src=".doc/favicon.ico" alt="DocNest Logo" width="160" height="160" />
+    <img src=".doc/logo192.png" alt="DocNest Logo" width="160" height="160" />
     <p>🎤 一个创新的客户服务和语音交互平台，结合深度学习，助力企业打造智能、个性化的语音客服系统。</p>
     <p>🗣️ 支持语音识别、语音合成，智能交互，并无缝接入其他 Web 应用，赋能企业级的 AI 语音助手。</p>
     <p>
