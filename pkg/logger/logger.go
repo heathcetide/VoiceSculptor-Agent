@@ -1,11 +1,10 @@
 package logger
 
 import (
-	"os"
-
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
 )
 
 type LogConfig struct {
@@ -43,7 +42,7 @@ func Init(cfg *LogConfig, mode string) (err error) {
 	lg = zap.New(core, zap.AddCaller()) // zap.AddCaller() 添加调用栈信息
 
 	zap.ReplaceGlobals(lg) // 替换zap包全局的logger
-	zap.L().Info("init logger success")
+	Info("init logger success")
 	return
 }
 

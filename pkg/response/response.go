@@ -34,3 +34,11 @@ func Result(context *gin.Context, httpStatus int, code int, msg string, data gin
 		"data": data,
 	})
 }
+
+func AbortWithStatus(c *gin.Context, httpStatus int) {
+	c.AbortWithStatus(httpStatus)
+}
+
+func AbortWithStatusJSON(c *gin.Context, httpStatus int, err error) {
+	c.AbortWithStatusJSON(httpStatus, gin.H{"error": err.Error()})
+}

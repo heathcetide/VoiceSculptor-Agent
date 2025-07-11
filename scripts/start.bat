@@ -17,4 +17,11 @@ exit /b 1
 
 REM 设置环境变量并启动应用
 set APP_ENV=%MODE%
-go run cmd/server/main.go -mode=%MODE% 
+start "voiceSculptor backend server" go run cmd/server/main.go -mode=%MODE%
+
+cd ui/
+start "voiceSculptor fontend server" npm start
+
+cd ../third_party/rustpbx/
+cargo run --bin rustpbx -- --conf config.toml
+

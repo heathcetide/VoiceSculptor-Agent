@@ -32,34 +32,6 @@
     <script src="//cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="//cdn.jsdelivr.net/npm/inter-ui@4.0.2/inter.min.css" rel="stylesheet"/>
     <script src="https://unpkg.com/fuse.js@6.6.2/dist/fuse.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const editor = CodeMirror.fromTextArea(document.getElementById('json-editor'), {
-                mode: 'application/json',
-                lineNumbers: true,
-                theme: 'default',
-                autorefresh: true
-            });
-
-            // Store editor in Alpine.js store
-            Alpine.store('codeMirrorEditor', editor);
-
-            // Automatically sync changes from CodeMirror to Alpine store
-            editor.on('change', function (cm) {
-                Alpine.store('tester').body = cm.getValue();  // Update Alpine's tester body
-            });
-
-            // Sync Alpine store changes back to CodeMirror
-            new MutationObserver(() => {
-                if (editor.getValue() !== Alpine.raw(Alpine.store('tester').body)) {
-                    editor.setValue(Alpine.raw(Alpine.store('tester').body));  // Update editor if Alpine store changes
-                }
-            }).observe(editor.getWrapperElement(), {childList: true, subtree: true});
-        });
-    </script>
 </head>
 
 <body class="h-full">
@@ -105,18 +77,6 @@
         Alpine.directive('markdown', el => {
             el.innerHTML = marked.parse(el.textContent)
         })
-        Alpine.store('codeMirrorEditor', null);
-        Alpine.store('tester', {
-            path: '',
-            method: 'GET',
-            headers: [{ key: '', value: '' }],
-            params: [{ key: '', value: '' }],
-            body: '',
-            bodyType: 'json',
-            response: null,
-            statusCode: null,
-            duration: 0
-        });
     })
 
     function renderMethodClass(method) {
@@ -183,7 +143,12 @@
             let body;
             if (this.tester.bodyType === 'json') {
                 headers['Content-Type'] = 'application/json';
-                body = this.tester.body;
+                try {
+                    body = JSON.stringify(JSON.parse(this.tester.body));
+                } catch (e) {
+                    alert('请求体不是合法的 JSON 格式，请检查并修正。');
+                    return;
+                }
             } else if (this.tester.bodyType === 'form') {
                 body = new FormData();
                 body.append('file', this.tester.file);
@@ -425,43 +390,33 @@
                                     <span class="text-sm text-gray-600" x-text="item.summary"></span>
                                     <button
                                             class="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1"
-                                            @click="() => {
-    resetTester();
-    showTester = true;
-    tester.path = item.path;
-    tester.method = item.method.toUpperCase();
-    tester.bodyType = 'json';
-    tester.headers = [{ key: '', value: '' }];
-    tester.params = [{ key: '', value: '' }];
-    tester.response = null;
-    tester.statusCode = null;
-    tester.duration = 0;
+                                            @click="
+        resetTester();
+        showTester = true;
+        tester.path = item.path;
+        tester.method = item.method.toUpperCase();
+        tester.bodyType = 'json';
 
-    // 设置路径参数（如 GET /path/:id）
-    if (item.isObject && ['GET', 'PUT', 'PATCH', 'DELETE'].includes(tester.method)) {
-        tester.path = item.path + '/:' + (item.primaryKey || 'id');
-    }
+        // 设置路径参数（如 GET /path/:id）
+        if (item.isObject && ['GET', 'PUT', 'PATCH', 'DELETE'].includes(tester.method)) {
+            tester.path = item.path + '/:' + (item.primaryKey || 'id');
+        }
 
-    // 如果有字段，构造默认请求体 JSON
-    if (item.request && item.request.fields && item.request.fields.length > 0) {
-        const bodyObj = {};
-        item.request.fields.forEach(field => {
-        switch (field.type) {
-            case 'string': bodyObj[field.name] = ''; break;
-            case 'boolean': bodyObj[field.name] = false; break;
-            case 'number':
-            case 'integer': bodyObj[field.name] = 0; break;
-            default: bodyObj[field.name] = null;
-            }
-        });
-        tester.body = JSON.stringify(bodyObj, null, 2);
-        const cmEditor = Alpine.store('codeMirrorEditor');
-        if (cmEditor) cmEditor.setValue(tester.body);
-    } else {
-        tester.body = '';
-    }
-}"
-
+        // 如果有字段，构造默认请求体 JSON
+        if (item.request && item.request.fields && item.request.fields.length > 0) {
+            const bodyObj = {};
+            item.request.fields.forEach(field => {
+                switch (field.type) {
+                    case 'string': bodyObj[field.name] = ''; break;
+                    case 'boolean': bodyObj[field.name] = false; break;
+                    case 'number':
+                    case 'integer': bodyObj[field.name] = 0; break;
+                    default: bodyObj[field.name] = null;
+                }
+            });
+            tester.body = JSON.stringify(bodyObj, null, 2);
+        }
+    "
                                     >
                                         测试 →
                                     </button>
@@ -849,23 +804,14 @@
                         </select>
                     </div>
 
-                    <!-- JSON 或 Text：使用 textarea -->
                     <template x-if="tester.bodyType === 'json' || tester.bodyType === 'text'">
-                        <div x-init="$nextTick(() => {
-    const el = document.getElementById('json-editor');
-    if (el && !el.classList.contains('cm-initialized')) {
-        const editor = CodeMirror.fromTextArea(el, {
-            mode: 'application/json',
-            lineNumbers: true,
-            theme: 'default',
-            autorefresh: true
-        });
-        Alpine.store('codeMirrorEditor', editor);
-        el.classList.add('cm-initialized');
-    }
-})">
-                        <label class="block text-sm font-medium text-purple-700">请求体</label>
-                            <textarea id="json-editor" x-model="tester.body" placeholder="请输入 JSON..."></textarea>
+                        <div>
+                            <label class="block text-sm font-medium text-purple-700">请求体</label>
+                            <textarea
+                                    x-model="tester.body"
+                                    placeholder="请输入请求体内容（JSON 或 Text）"
+                                    class="mt-1 block w-full h-40 rounded-md border border-purple-300 bg-purple-50 text-purple-900 shadow-sm text-sm px-3 py-2 focus:border-purple-400 focus:ring-1 focus:ring-purple-500"
+                            ></textarea>
                         </div>
                     </template>
 

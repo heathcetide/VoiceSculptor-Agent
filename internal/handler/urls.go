@@ -6,6 +6,7 @@ import (
 	"VoiceSculptor/internal/models"
 	"VoiceSculptor/pkg/config"
 	"VoiceSculptor/pkg/middleware"
+	"VoiceSculptor/pkg/notification"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -22,13 +23,19 @@ func NewHandlers(db *gorm.DB) *Handlers {
 
 func (h *Handlers) Register(engine *gin.Engine) {
 	r := engine.Group(config.GlobalConfig.APIPrefix)
-	// 注册系统模块功能
+
+	// Register Global Singleton DB
+	r.Use(middleware.InjectDB(h.db))
+	// Register System Module Routes
 	h.registerSystemRoutes(r)
 
-	// 注册各模块的路由
+	// Register Business Module Routes
 	h.registerAuthRoutes(r)
 	h.registerAssistantRoutes(r)
 	h.registerChatRoutes(r)
+	h.registerNotificationRoutes(r)
+	h.registerCredentialsRoutes(r)
+	h.registerGroupRoutes(r)
 
 	objs := h.GetObjs()
 	voiceSculptor.RegisterObjects(r, objs)
@@ -47,61 +54,123 @@ func (h *Handlers) Register(engine *gin.Engine) {
 
 // User Module
 func (h *Handlers) registerAuthRoutes(r *gin.RouterGroup) {
-	r.Use(middleware.InjectDB(h.db))
 	auth := r.Group(config.GlobalConfig.AuthPrefix)
 	{
 		// register
-		auth.GET("register", h.handleUserSignupPage)
+		auth.GET("/register", h.handleUserSignupPage)
 
-		auth.POST("register", h.handleUserSignup)
+		auth.POST("/register", h.handleUserSignup)
 
-		auth.POST("send/email", h.handleSendEmailCode)
+		auth.POST("/register/email", h.handleUserSignupByEmail)
+
+		auth.POST("/send/email", h.handleSendEmailCode)
 
 		// login
-		auth.GET("login", h.handleUserSigninPage)
+		auth.GET("/login", h.handleUserSigninPage)
 
-		auth.POST("login", h.handleUserSignin)
+		auth.POST("/login", h.handleUserSignin)
+
+		auth.POST("/login/email", h.handleUserSigninByEmail)
 
 		// logout
-		auth.GET("logout", h.handleUserLogout)
+		auth.GET("/logout", models.AuthRequired, h.handleUserLogout)
 
-		auth.GET("info", h.handleUserInfo)
+		auth.GET("/info", models.AuthRequired, h.handleUserInfo)
 
-		auth.GET("reset-password", h.handleUserResetPasswordPage)
+		auth.GET("/reset-password", h.handleUserResetPasswordPage)
+
+		// update
+		auth.PUT("/update", models.AuthRequired, h.handleUserUpdate)
+
+		auth.PUT("/update/preferences", models.AuthRequired, h.handleUserUpdatePreferences)
 	}
 }
 
 func (h *Handlers) registerAssistantRoutes(r *gin.RouterGroup) {
 	assistant := r.Group("assistant")
 	{
-		assistant.POST("", h.CreateAssistant)
+		assistant.POST("add", models.AuthRequired, h.CreateAssistant)
 
-		assistant.GET("", h.ListAssistants)
+		assistant.GET("", models.AuthRequired, h.ListAssistants)
 
-		assistant.GET("/:id", h.GetAssistant)
+		assistant.GET("/:id", models.AuthRequired, h.GetAssistant)
 
-		assistant.PUT("/:id", h.UpdateAssistant)
+		assistant.PUT("/:id", models.AuthRequired, h.UpdateAssistant)
 
-		assistant.DELETE("/:id", h.DeleteAssistant)
+		assistant.DELETE("/:id", models.AuthRequired, h.DeleteAssistant)
 
+		assistant.GET("/voiceSculptor/client/:id/loader.js", h.ServeVoiceSculptorLoaderJS)
 	}
 }
 
 func (h *Handlers) registerChatRoutes(r *gin.RouterGroup) {
 	chat := r.Group("chat")
+	chat.Use(models.AuthApiRequired)
 	{
-		chat.POST("/start", h.Chat)
+		chat.POST("start", h.Chat)
 
-		chat.POST("/stop", h.StopChat)
+		chat.POST("stop", h.StopChat)
+
+		chat.GET("stream", h.ChatStream)
+
+		chat.GET("chat-session-log", h.getChatSessionLog)
+
+		chat.GET("chat-session-log/:id", h.getChatSessionLogDetail)
+	}
+}
+
+func (h *Handlers) registerNotificationRoutes(r *gin.RouterGroup) {
+	notificationGroup := r.Group("notification")
+	{
+		notificationGroup.GET("unread-count", models.AuthRequired, h.handleUnReadNotificationCount)
+
+		notificationGroup.GET("", models.AuthRequired, h.handleListNotifications)
+
+		notificationGroup.POST("readAll", models.AuthRequired, h.handleAllNotifications)
+
+		notificationGroup.PUT("/read/:id", models.AuthRequired, h.handleMarkNotificationAsRead)
+
+		notificationGroup.DELETE("/:id", models.AuthRequired, h.handleDeleteNotification)
 	}
 }
 
 func (h *Handlers) registerSystemRoutes(r *gin.RouterGroup) {
-	system := r.Group("/system")
+	system := r.Group("system")
 	{
 		system.POST("/rate-limiter/config", h.UpdateRateLimiterConfig)
 
 		system.GET("/health", h.HealthCheck)
+	}
+}
+
+func (h *Handlers) registerCredentialsRoutes(r *gin.RouterGroup) {
+	credential := r.Group("credentials")
+	{
+		credential.POST("/", models.AuthRequired, h.handleCreateCredential)
+
+		credential.GET("/", models.AuthRequired, h.handleGetCredential)
+	}
+}
+
+func (h *Handlers) registerGroupRoutes(r *gin.RouterGroup) {
+	group := r.Group("group")
+	group.OPTIONS("/*cors", func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.AbortWithStatus(204)
+	})
+	group.Use(models.AuthRequired)
+	{
+		group.POST("/", h.CreateGroup)
+
+		group.GET("/", h.ListGroups)
+
+		group.GET("/:id", h.GetGroup)
+
+		group.PUT("/:id", h.UpdateGroup)
+
+		group.DELETE("/:id", h.DeleteGroup)
 	}
 }
 
@@ -134,27 +203,28 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 	iconAssistant, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_assistant.svg")
 	iconChatLog, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_chat_log.svg")
 	iconUserCredential, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_user_credential.svg")
+	iconInternalNotification, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_internal_notification.svg")
 	admins := []models.AdminObject{
 		{
 			Model:       &models.Assistant{},
 			Group:       "Business",
 			Name:        "Assistant",
 			Desc:        "This is a definition of AI assistant, including the use of prompts and so on.",
-			Shows:       []string{"ID", "Name", "SystemPrompt", "Instruction", "PersonaTag", "MaxTokens", "Temperature", "CreatedAt"},
-			Editables:   []string{"ID", "Name", "SystemPrompt", "Instruction", "PersonaTag", "MaxTokens", "Temperature", "CreatedAt"},
+			Shows:       []string{"ID", "Name", "SystemPrompt", "Instruction", "PersonaTag", "MaxTokens", "Temperature", "JsSourceID", "CreatedAt"},
+			Editables:   []string{"ID", "Name", "SystemPrompt", "Instruction", "PersonaTag", "MaxTokens", "Temperature", "JsSourceID", "CreatedAt"},
 			Orderables:  []string{"UpdatedAt"},
 			Searchables: []string{"Name"},
 			Requireds:   []string{"Name"},
 			Icon:        &models.AdminIcon{SVG: string(iconAssistant)},
 		},
 		{
-			Model:       &models.ChatLog{},
+			Model:       &models.ChatSessionLog{},
 			Group:       "Business",
-			Name:        "ChatLog",
+			Name:        "ChatSessionLog",
 			Desc:        "This is a conversation log, which records the AI conversation log.",
-			Shows:       []string{"ID", "Input", "Output", "PromptTokens", "OutputTokens", "CreatedAt"},
-			Editables:   []string{"ID", "Input", "Output", "PromptTokens", "OutputTokens", "UpdatedAt"},
-			Orderables:  []string{"UpdatedAt"},
+			Shows:       []string{"ID", "SessionID", "Content", "CreatedAt", "UserID"},
+			Editables:   []string{"ID", "SessionID", "Content", "CreatedAt", "UserID"},
+			Orderables:  []string{"CreatedAt"},
 			Searchables: []string{"UserID"},
 			Requireds:   []string{"UserID"},
 			Icon:        &models.AdminIcon{SVG: string(iconChatLog)},
@@ -170,6 +240,17 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 			Searchables: []string{"LLMProvider"},
 			Requireds:   []string{"LLMProvider"},
 			Icon:        &models.AdminIcon{SVG: string(iconUserCredential)},
+		},
+		{
+			Model:       &notification.InternalNotification{},
+			Group:       "Business",
+			Name:        "InternalNotification",
+			Desc:        "This is a notification used to notify the user of the system.",
+			Shows:       []string{"ID", "Title", "Read", "CreatedAt"},
+			Editables:   []string{"ID", "UserID", "Title", "Content", "Read", "CreatedAt"},
+			Orderables:  []string{"CreatedAt"},
+			Searchables: []string{"Title"},
+			Icon:        &models.AdminIcon{SVG: string(iconInternalNotification)},
 		},
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))

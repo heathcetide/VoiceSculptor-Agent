@@ -44,6 +44,13 @@ type LoginForm struct {
 	AuthToken string `json:"token,omitempty"`
 }
 
+type EmailOperatorForm struct {
+	Email     string `json:"email" comment:"Email address"`
+	Code      string `json:"code"`
+	AuthToken bool   `json:"AuthToken,omitempty"`
+	Timezone  string `json:"timezone,omitempty"`
+}
+
 type RegisterUserForm struct {
 	Email       string `json:"email" binding:"required"`
 	Password    string `json:"password" binding:"required"`
@@ -67,6 +74,17 @@ type ResetPasswordDoneForm struct {
 	Password string `json:"password" binding:"required"`
 	Email    string `json:"email" binding:"required"`
 	Token    string `json:"token" binding:"required"`
+}
+
+type UpdateUserRequest struct {
+	Email       string `form:"email" json:"email"`
+	Phone       string `form:"phone" json:"phone"`
+	DisplayName string `form:"displayName" json:"displayName"`
+	Locale      string `form:"locale" json:"locale"`
+	Timezone    string `form:"timezone" json:"timezone"`
+	Gender      string `form:"gender" json:"gender"`
+	Extra       string `form:"extra" json:"extra"`
+	Avatar      string `form:"avatar" json:"avatar"`
 }
 
 func Login(c *gin.Context, user *User) {
@@ -114,11 +132,79 @@ func AuthRequired(c *gin.Context) {
 	c.Next()
 }
 
+func AuthApiRequired(c *gin.Context) {
+	if CurrentUser(c) != nil {
+		c.Next()
+		return
+	}
+
+	apiKey := c.GetHeader("X-API-KEY")
+	apiSecret := c.GetHeader("X-API-SECRET")
+	if apiKey != "" && apiSecret != "" {
+		user, err := GetUserByAPIKey(c, apiKey, apiSecret)
+		if err != nil {
+			voiceSculptor.AbortWithJSONError(c, http.StatusUnauthorized, err)
+			return
+		}
+		c.Set(constants.UserField, user)
+		c.Next()
+		return
+	}
+
+	apiKey = c.Query("apiKey")
+	apiSecret = c.Query("apiSecret")
+	if apiKey != "" && apiSecret != "" {
+		user, err := GetUserByAPIKey(c, apiKey, apiSecret)
+		if err != nil {
+			voiceSculptor.AbortWithJSONError(c, http.StatusUnauthorized, err)
+			return
+		}
+		c.Set(constants.UserField, user)
+		c.Next()
+		return
+	}
+
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		token = c.Query("token")
+	}
+
+	if token == "" {
+		voiceSculptor.AbortWithJSONError(c, http.StatusUnauthorized, errors.New("authorization required"))
+		return
+	}
+
+	db := c.MustGet(constants.DbField).(*gorm.DB)
+	// split bearer
+	token = strings.TrimPrefix(token, "Bearer ")
+	user, err := DecodeHashToken(db, token, false)
+	if err != nil {
+		voiceSculptor.AbortWithJSONError(c, http.StatusUnauthorized, err)
+		return
+	}
+	c.Set(constants.UserField, user)
+	c.Next()
+}
+
+func GetUserByAPIKey(c *gin.Context, apiKey, apiSecret string) (*User, error) {
+	db := c.MustGet(constants.DbField).(*gorm.DB)
+	var userCredential UserCredential
+	err := db.Model(&UserCredential{}).Where("api_key = ? AND api_secret = ?", apiKey, apiSecret).Find(&userCredential).Error
+	if err != nil {
+		return nil, err
+	}
+	var user *User
+	err = db.Model(&User{}).Where("id = ?", userCredential.UserID).Find(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func CurrentUser(c *gin.Context) *User {
 	if cachedObj, exists := c.Get(constants.UserField); exists && cachedObj != nil {
 		return cachedObj.(*User)
 	}
-
 	session := sessions.Default(c)
 	userId := session.Get(constants.UserField)
 	if userId == nil {
@@ -281,7 +367,11 @@ func InTimezone(c *gin.Context, timezone string) {
 	session.Save()
 }
 
-func BuildAuthToken(db *gorm.DB, user *User, expired time.Duration, useLoginTime bool) string {
+func BuildAuthToken(user *User, expired time.Duration, useLoginTime bool) string {
 	n := time.Now().Add(expired)
 	return EncodeHashToken(user, n.Unix(), useLoginTime)
+}
+
+func UpdateUser(db *gorm.DB, user *User, vals map[string]any) error {
+	return db.Model(user).Updates(vals).Error
 }

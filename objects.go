@@ -2,6 +2,7 @@ package voiceSculptor
 
 import (
 	constants "VoiceSculptor/pkg/constant"
+	"VoiceSculptor/pkg/response"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -864,7 +865,8 @@ func AbortWithJSONError(c *gin.Context, code int, err error) {
 
 	if c.IsAborted() {
 		c.JSON(code, gin.H{"error": err.Error()})
+		response.Fail(c, err.Error(), nil)
 	} else {
-		c.AbortWithStatusJSON(code, gin.H{"error": err.Error()})
+		response.AbortWithStatusJSON(c, code, err)
 	}
 }

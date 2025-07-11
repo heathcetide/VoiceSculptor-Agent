@@ -32,6 +32,9 @@ var WelcomeHTML string
 //go:embed templates/email/verification.html
 var VerificationHTML string
 
+//go:embed static/js/client.js
+var AssistantJsModule string
+
 type CombineEmbedFS struct {
 	embeds    []EmbedFS
 	assertDir string

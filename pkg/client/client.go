@@ -45,6 +45,7 @@ type Client struct {
 	config       Config
 	started      bool
 	startedMutex sync.Mutex
+	sseChan      chan string
 }
 
 // NewSDK initializes the SDK with the given config
@@ -73,7 +74,15 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		logger:    logger,
 		config:    cfg,
 		llmClient: llmClient,
+		sseChan:   make(chan string, 100),
 	}
+
+	go func() {
+		for msg := range llmClient.SSE {
+			sdk.sseChan <- msg
+		}
+	}()
+
 	return sdk, nil
 }
 
@@ -117,15 +126,15 @@ func (s *Client) StartCall() error {
 
 // 在handleVoiceTimeout中使用llmClient向用户发送消息
 func (s *Client) handleVoiceTimeout() {
-	voiceTimer := time.NewTimer(12 * time.Second)
-	disconnectTimer := time.NewTimer(60 * time.Second)
+	voiceTimer := time.NewTimer(20 * time.Second)
+	disconnectTimer := time.NewTimer(80 * time.Second)
 
 	for {
 		select {
 		case <-voiceTimer.C:
-			// 12秒未收到语音输入，询问是否在线
+			// 20秒未收到语音输入，询问是否在线
 			s.llmClient.SendMessage("请问您还在线吗？")
-			voiceTimer.Reset(12 * time.Second) // 重置计时器
+			voiceTimer.Reset(20 * time.Second) // 重置计时器
 
 		case <-disconnectTimer.C:
 			// 60秒未收到语音输入，自动断开连接
@@ -159,4 +168,9 @@ func fetchICEServers(url string) ([]webrtc.ICEServer, error) {
 		return nil, err
 	}
 	return iceServers, nil
+}
+
+// SSEChannel 返回 SSE 消息通道（只读）
+func (c *Client) SSEChannel() <-chan string {
+	return c.sseChan
 }

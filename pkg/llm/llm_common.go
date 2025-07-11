@@ -17,6 +17,7 @@ type OpenAIConfig struct {
 // OpenAIClient 是与 OpenAI API 通信的客户端
 type OpenAIClient struct {
 	Config OpenAIConfig
+	SSE    chan string
 }
 
 // OpenAIResponse 用于解析 OpenAI API 响应
@@ -54,11 +55,21 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 			APIKey: apiKey,
 			URL:    "https://open.bigmodel.cn/api/paas/v4/chat/completions",
 		},
+		SSE: make(chan string, 100),
 	}
 }
 
 // GenerateText 调用 OpenAI API 生成文本
-func (client *OpenAIClient) GenerateText(prompt string) (string, error) {
+func (client *OpenAIClient) GenerateText(SystemPrompt, input, Instruction, persona string) (string, error) {
+	if persona != "" {
+		SystemPrompt = fmt.Sprintf("你当前的角色是: %s.\n%s", persona, SystemPrompt)
+	}
+
+	prompt := fmt.Sprintf("%s\n\n用户：%s\n\n%s",
+		SystemPrompt,
+		input,
+		Instruction,
+	)
 	// 构建请求体
 	requestData := OpenAIRequest{
 		Model: "glm-4", // 或者 "gpt-4" 具体的模型名称
@@ -103,9 +114,12 @@ func (client *OpenAIClient) GenerateText(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to decode response body: %w", err)
 	}
 
-	// 返回生成的文本
 	if len(respData.Choices) > 0 {
-		return respData.Choices[0].Message.Content, nil
+		content := respData.Choices[0].Message.Content
+		if client.SSE != nil {
+			client.SSE <- "[agent] " + content
+		}
+		return content, nil
 	}
 
 	return "", fmt.Errorf("no choices found in the response")
@@ -113,6 +127,11 @@ func (client *OpenAIClient) GenerateText(prompt string) (string, error) {
 
 // SendMessage 向用户发送消息并获得回应
 func (client *OpenAIClient) SendMessage(content string) (string, error) {
+	// 🌟 推送内容到 SSE
+	if client.SSE != nil {
+		client.SSE <- "[agent] " + content
+	}
+
 	// 构建请求体
 	requestData := OpenAIRequest{
 		Model: "glm-4", // 或者 "gpt-4" 具体的模型名称
@@ -159,7 +178,11 @@ func (client *OpenAIClient) SendMessage(content string) (string, error) {
 
 	// 返回生成的文本
 	if len(respData.Choices) > 0 {
-		return respData.Choices[0].Message.Content, nil
+		reply := respData.Choices[0].Message.Content
+		if client.SSE != nil {
+			client.SSE <- "[agent] " + reply
+		}
+		return reply, nil
 	}
 
 	return "", fmt.Errorf("no choices found in the response")

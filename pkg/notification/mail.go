@@ -104,7 +104,7 @@ func (m *MailNotification) SendHTML(to, subject, htmlBody string) error {
 // SendHTML sends an HTML email using the embedded welcome template
 func (m *MailNotification) SendWelcomeEmail(to string, username string, verifyURL string) error {
 	// Parse the embedded template
-	tmpl, err := template.New("welcome_email").Parse(voiceSculptor.WelcomeHTML)
+	tmpl, err := template.New("welcome").Parse(voiceSculptor.WelcomeHTML)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -138,17 +138,15 @@ func (m *MailNotification) SendWelcomeEmail(to string, username string, verifyUR
 }
 
 func (m *MailNotification) SendVerificationCode(to, code string) error {
-	tmpl, err := template.New("verification_email").Parse(voiceSculptor.VerificationHTML)
+	tmpl, err := template.New("verification").Parse(voiceSculptor.VerificationHTML)
 	if err != nil {
 		return fmt.Errorf("failed to parse verification template: %w", err)
 	}
-
 	data := struct {
 		Code string
 	}{
 		Code: code,
 	}
-
 	var body bytes.Buffer
 	if err := tmpl.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to render verification email: %w", err)

@@ -32,12 +32,11 @@ func TestChatHandler_StartAndStopVoiceCall(t *testing.T) {
 		Name:        "test-cred",
 		LLMProvider: "openai",
 		LLMApiKey:   "83fb4b9faddc98a274664b5bd4141aa7.6nNum7w223OgxqV3",
-		Quota:       10000,
 	}
 	db.Create(cred)
 
 	assistant := &models.Assistant{
-		UserID:       int64(user.ID),
+		UserID:       user.ID,
 		Name:         "优雅导师",
 		SystemPrompt: "你是一位温柔的导师。",
 		Instruction:  "请耐心解答用户的问题。",

@@ -10,6 +10,7 @@ import (
 const (
 	GroupRoleAdmin  = "admin"
 	GroupRoleMember = "member"
+	SigInitDBConfig = "system.init"
 )
 
 type BaseModel struct {
@@ -28,7 +29,9 @@ type User struct {
 	UpdatedAt time.Time  `json:"-" gorm:"autoUpdateTime"`
 	DeletedAt *time.Time `json:"-" gorm:"index"`
 
-	Email       string     `json:"email" gorm:"size:128;uniqueIndex"`
+	Email              string `json:"email" gorm:"size:128;uniqueIndex"`
+	EmailNotifications bool   `json:"emailNotifications"`
+
 	Password    string     `json:"-" gorm:"size:128"`
 	Phone       string     `json:"phone,omitempty" gorm:"size:64;index"`
 	FirstName   string     `json:"firstName,omitempty" gorm:"size:128"`
@@ -56,19 +59,29 @@ type User struct {
 }
 
 type UserCredential struct {
-	ID        uint      `gorm:"primaryKey"`
-	UserID    uint      `gorm:"index;"`               // 关联到用户
-	Name      string    `json:"name"`                 // 应用名称 or 用途备注
-	APIKey    string    `gorm:"uniqueIndex;not null"` // 用于认证
-	APISecret string    `gorm:"not null"`             // 用于签名校验
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	ID        uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"index;"`               // 关联到用户
+	Name      string `json:"name"`                 // 应用名称 or 用途备注
+	APIKey    string `gorm:"uniqueIndex;not null"` // 用于认证
+	APISecret string `gorm:"not null"`             // 用于签名校验
 
-	LLMProvider string `json:"llmProvider"` // 可绑定每个 key 使用不同模型
+	LLMProvider string `json:"llmProvider"`
 	LLMApiKey   string `json:"llmApiKey"`
 	LLMApiURL   string `json:"llmApiUrl"`
-	Quota       int    `json:"quota"` // 总额度
-	Used        int    `json:"used"`  // 已用
+
+	AsrProvider  string `json:"asrProvider"`
+	AsrAppID     string `json:"asrAppId"`
+	AsrSecretID  string `json:"asrSecretId"`
+	AsrSecretKey string `json:"asrSecretKey"`
+	AsrLanguage  string `json:"language"`
+
+	TtsProvider  string `json:"ttsProvider"`
+	TTSAppID     string `json:"ttsAppId"`
+	TTSSecretID  string `json:"ttsSecretId"`
+	TTSSecretKey string `json:"ttsSecretKey"`
+
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
 
 type GroupPermission struct {

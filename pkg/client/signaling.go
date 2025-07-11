@@ -98,14 +98,14 @@ func (s *SignalingClient) handleEvent(evt EventMessage) {
 }
 
 func (s *SignalingClient) handleASRFinal(input string) {
-	prompt := fmt.Sprintf("%s\n\n用户：%s\n\n%s",
-		s.promptCfg.SystemPrompt,
-		input,
-		s.promptCfg.Instruction,
-	)
-	s.logger.Infof("Constructed prompt: %s", prompt)
+	s.logger.Infof("Constructed prompt: %s   -    %s     -    %s", s.promptCfg.SystemPrompt, input, s.promptCfg.Instruction)
 
-	reply, err := s.llmClient.GenerateText(prompt)
+	// 推送用户输入给 SSE
+	if s.llmClient != nil && s.llmClient.SSE != nil {
+		s.llmClient.SSE <- "[user] " + input
+	}
+
+	reply, err := s.llmClient.GenerateText(s.promptCfg.SystemPrompt, input, s.promptCfg.Instruction, s.promptCfg.PersonaTag)
 	if err != nil {
 		s.logger.Errorf("LLM generation failed: %v", err)
 		return
