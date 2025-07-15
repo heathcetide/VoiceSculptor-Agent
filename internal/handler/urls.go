@@ -204,6 +204,8 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 	iconChatLog, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_chat_log.svg")
 	iconUserCredential, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_user_credential.svg")
 	iconInternalNotification, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_internal_notification.svg")
+	iconPrompt, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_prompt_model.svg")
+	iconPromptArg, _ := voiceSculptor.EmbedStaticAssets.ReadFile("static/img/icon_prompt_args.svg")
 	admins := []models.AdminObject{
 		{
 			Model:       &models.Assistant{},
@@ -251,6 +253,28 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 			Orderables:  []string{"CreatedAt"},
 			Searchables: []string{"Title"},
 			Icon:        &models.AdminIcon{SVG: string(iconInternalNotification)},
+		},
+		{
+			Model:       &models.PromptModel{},
+			Group:       "Business",
+			Name:        "PromptModel",
+			Desc:        "This is a PromptModel, can quick build prompt",
+			Shows:       []string{"ID", "Name", "Description", "CreatedAt", "UpdatedAt"},
+			Editables:   []string{"ID", "Name", "Description", "CreatedAt", "UpdatedAt"},
+			Orderables:  []string{"CreatedAt"},
+			Searchables: []string{"Name"},
+			Icon:        &models.AdminIcon{SVG: string(iconPrompt)},
+		},
+		{
+			Model:       &models.PromptArgModel{},
+			Group:       "Business",
+			Name:        "PromptArgModel",
+			Desc:        "This is a PromptModel Args to fill model",
+			Shows:       []string{"ID", "Name", "Description", "Required", "PromptID"},
+			Editables:   []string{"ID", "Name", "Description", "Required", "PromptID"},
+			Orderables:  []string{"ID"},
+			Searchables: []string{"Name"},
+			Icon:        &models.AdminIcon{SVG: string(iconPromptArg)},
 		},
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))

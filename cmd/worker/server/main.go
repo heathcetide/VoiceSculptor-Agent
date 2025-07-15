@@ -12,7 +12,6 @@ import (
 // 定义一个 upgrader，将 HTTP 请求升级为 WebSocket 请求
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// 这里你可以添加对跨域请求的检查
 		return true
 	},
 }

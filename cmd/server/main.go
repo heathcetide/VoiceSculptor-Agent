@@ -11,6 +11,7 @@ import (
 	"VoiceSculptor/pkg/logger"
 	"VoiceSculptor/pkg/middleware"
 	"VoiceSculptor/pkg/notification"
+	"VoiceSculptor/pkg/prompt"
 	"VoiceSculptor/pkg/util"
 	"flag"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	"gorm.io/gorm"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -90,72 +90,50 @@ func initDefaultConfigs(db *gorm.DB) error {
 		}
 	}
 
-	defaultAssistant := []models.Assistant{
+	defaultPrompts := []models.PromptModel{
 		{
-			UserID:       1,
-			Name:         "技术支持",
-			Description:  "提供技术支持, 解答各种技术支持问题",
-			Icon:         "MessageCircle",
-			SystemPrompt: "你是一个专业的技术支持工程师，专注于帮助用户解决技术相关的问题。",
-			Instruction:  "请以清晰、专业的方式回答用户的提问，尽量提供步骤化的解决方案。对于复杂问题，请分点说明并使用示例进行解释。",
-			PersonaTag:   "support",
-			Temperature:  0.6,
-			MaxTokens:    50,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			Name:        "summarize_article",
+			Description: "总结文章的主要内容，适合长文段或博客文章提炼摘要。",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 		},
 		{
-			UserID:       1,
-			Name:         "智能助手",
-			Description:  "智能助手，提供各种智能服务",
-			Icon:         "Bot",
-			SystemPrompt: "你是一个智能助手，请以助手的身份回答用户的提问。",
-			Instruction:  "请以清晰、专业、助手的身份回答用户的提问，尽量提供步骤化的解决方案。对于复杂问题，请分点说明并使用示例进行解释。",
-			PersonaTag:   "assistant",
-			Temperature:  0.6,
-			MaxTokens:    50,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			Name:        "translate_text",
+			Description: "将输入文本翻译为指定语言，适合中英文互译等场景。",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 		},
 		{
-			UserID:       1,
-			Name:         "导师",
-			Description:  "导师，提供各种指导服务",
-			Icon:         "Users",
-			SystemPrompt: "你是一个导师，请以导师的身份回答用户的提问。",
-			Instruction:  "请以清晰、专业、导师的身份回答用户的提问，尽量提供步骤化的解决方案。对于复杂问题，请分点说明并使用示例进行解释。",
-			PersonaTag:   "mentor",
-			Temperature:  0.6,
-			MaxTokens:    50,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			Name:        "generate_title",
+			Description: "根据文章内容生成简洁有吸引力的标题。",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 		},
 		{
-			UserID:       1,
-			Name:         "助手",
-			Description:  "一个助手，你可以使用它来回答你的问题。",
-			Icon:         "Zap",
-			SystemPrompt: "你是一个助手，请以助手的身份回答用户的提问。",
-			Instruction:  "请以助手的身份回答用户的提问，尽量提供步骤化的解决方案。对于复杂问题，请分点说明并使用示例进行解释。",
-			PersonaTag:   "assistant",
-			Temperature:  0.6,
-			MaxTokens:    50,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			Name:        "email_reply_generator",
+			Description: "根据邮件内容和意图自动生成专业的邮件回复。",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 		},
 	}
-	for _, user := range defaultAssistant {
-		var count int64
-		err := db.Model(&models.Assistant{}).Count(&count).Error
-		if err != nil {
-			return err
-		}
-		user.JsSourceID = strconv.FormatInt(util.SnowflakeUtil.NextID(), 20)
-		if err := db.Create(&user).Error; err != nil {
-			return err
-		}
-	}
+	db.Model(models.PromptModel{}).Create(defaultPrompts)
 
+	defaultArgs := []models.PromptArgModel{
+		// summarize_article
+		{Name: "content", Description: "待总结的文章内容", Required: true, PromptID: 1},
+
+		// translate_text
+		{Name: "text", Description: "要翻译的文本", Required: true, PromptID: 2},
+		{Name: "target_language", Description: "目标语言（如 en、zh）", Required: true, PromptID: 2},
+
+		// generate_title
+		{Name: "article", Description: "文章内容", Required: true, PromptID: 3},
+
+		// email_reply_generator
+		{Name: "email_body", Description: "原始邮件内容", Required: true, PromptID: 4},
+		{Name: "tone", Description: "回复语气（如正式、轻松）", Required: false, PromptID: 4},
+	}
+	db.Model(models.PromptArgModel{}).Create(defaultArgs)
 	return nil
 }
 
@@ -242,6 +220,8 @@ func main() {
 		&models.GroupMember{},
 		&models.Assistant{},
 		&models.ChatSessionLog{},
+		&models.PromptModel{},
+		&models.PromptArgModel{},
 		&notification.InternalNotification{},
 	})
 	if err != nil {
@@ -281,6 +261,12 @@ func main() {
 
 	// 9. Load Global Cache
 	util.InitGlobalCache(1024, 5*time.Minute)
+
+	//10. Load
+	err = prompt.InitPromptSystem(db)
+	if err != nil {
+		logger.Error("init prompt system failed: ", zap.Error(err))
+	}
 
 	// 10. New App
 	app := NewVoiceSculptorApp(db)
