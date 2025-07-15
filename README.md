@@ -210,28 +210,37 @@ API 文档可通过访问 `ip:port/api/docs` 查看系统自研文档。
 ![管理后台](.doc/img_admin.png)
 ---
 
-## 📊 监控 & 日志
+## 🚀 启动
 
-- 日志输出路径：`logs/app.log`
-- Prometheus 集成支持（可选）
-- Grafana 可视化监控面板（可选）
-
+页面入口
+![页面入口](.doc/login.png)
 ---
 
-## 📈 版本历史
+## 核心模块
 
-- v1.0.0 - 初始版本，基础功能完成
-- v1.1.0 - 新增用户权限模块
-- v1.2.0 - 集成 Redis 缓存提升性能
-- v2.0.0 - 重构代码结构，引入接口抽象层
+核心功能
+![核心功能](.doc/content.png)
+---
+
+### 架构图
+
+![架构图](.doc/architecture.png)
+---
+
+
+## 📊 监控 & 日志
+
+- 日志输出路径：`logs/voiceSculptor.log`
+- Prometheus 集成支持（可选）
+- Grafana 可视化监控面板（可选）
 
 ---
 
 ## 📬 联系方式
 
 如有问题或建议，请联系：
-- 邮箱: example@example.com
-- GitHub: [https://github.com/yourusername/yourprojectname](https://github.com/yourusername/yourprojectname)
+- 邮箱: 19511899044@163.com
+- GitHub: [https://github.com/heathcetide/VoiceSculptor-Agent](https://github.com/heathcetide/VoiceSculptor-Agent)
 
 ---
 
